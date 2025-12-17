@@ -1,0 +1,324 @@
+INFO:     Started server process [31190]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
+2025-12-16 10:07:50,264 INFO sqlalchemy.engine.Engine select pg_catalog.version()
+2025-12-16 10:07:50,265 INFO sqlalchemy.engine.Engine [raw sql] ()
+2025-12-16 10:07:50,310 INFO sqlalchemy.engine.Engine select current_schema()
+2025-12-16 10:07:50,310 INFO sqlalchemy.engine.Engine [raw sql] ()
+2025-12-16 10:07:50,315 INFO sqlalchemy.engine.Engine show standard_conforming_strings
+2025-12-16 10:07:50,315 INFO sqlalchemy.engine.Engine [raw sql] ()
+2025-12-16 10:07:50,321 INFO sqlalchemy.engine.Engine BEGIN (implicit)
+2025-12-16 10:07:50,362 INFO sqlalchemy.engine.Engine SELECT users.id, users.username, users.email, users.hashed_password, users.full_name, users.role, users.department_id, users.is_active, users.last_login, users.created_at, users.updated_at 
+FROM users 
+WHERE users.username = $1::VARCHAR
+2025-12-16 10:07:50,362 INFO sqlalchemy.engine.Engine [generated in 0.00036s] ('manager1',)
+2025-12-16 10:07:50,362 INFO sqlalchemy.engine.Engine BEGIN (implicit)
+2025-12-16 10:07:50,363 INFO sqlalchemy.engine.Engine SELECT users.id, users.username, users.email, users.hashed_password, users.full_name, users.role, users.department_id, users.is_active, users.last_login, users.created_at, users.updated_at 
+FROM users 
+WHERE users.username = $1::VARCHAR
+2025-12-16 10:07:50,363 INFO sqlalchemy.engine.Engine [cached since 0.001371s ago] ('manager1',)
+2025-12-16 10:07:50,363 INFO sqlalchemy.engine.Engine BEGIN (implicit)
+2025-12-16 10:07:50,363 INFO sqlalchemy.engine.Engine SELECT users.id, users.username, users.email, users.hashed_password, users.full_name, users.role, users.department_id, users.is_active, users.last_login, users.created_at, users.updated_at 
+FROM users 
+WHERE users.username = $1::VARCHAR
+2025-12-16 10:07:50,364 INFO sqlalchemy.engine.Engine [cached since 0.002069s ago] ('manager1',)
+2025-12-16 10:07:50,393 INFO sqlalchemy.engine.Engine SELECT notifications.id, notifications.user_id, notifications.title, notifications.message, notifications.notification_type, notifications.related_id, notifications.is_read, notifications.created_at 
+FROM notifications 
+WHERE notifications.user_id = $1::INTEGER ORDER BY notifications.created_at DESC
+2025-12-16 10:07:50,393 INFO sqlalchemy.engine.Engine [generated in 0.00023s] (2,)
+2025-12-16 10:07:50,400 INFO sqlalchemy.engine.Engine SELECT messages.id, messages.sender_id, messages.recipient_id, messages.department_id, messages.subject, messages.message, messages.is_read, messages.is_deleted_by_sender, messages.is_deleted_by_recipient, messages.parent_message_id, messages.created_at, messages.read_at 
+FROM messages 
+WHERE messages.sender_id = $1::INTEGER OR messages.recipient_id = $2::INTEGER AND messages.is_deleted_by_recipient = false OR messages.department_id = $3::INTEGER AND messages.is_deleted_by_recipient = false ORDER BY messages.created_at DESC
+2025-12-16 10:07:50,400 INFO sqlalchemy.engine.Engine [generated in 0.00026s] (2, 2, 1)
+2025-12-16 10:07:50,402 INFO sqlalchemy.engine.Engine SELECT employees.id, employees.employee_id, employees.first_name, employees.last_name, employees.email, employees.phone, employees.address, employees.department_id, employees.role_id, employees.user_id, employees.weekly_hours, employees.daily_max_hours, employees.shifts_per_week, employees.skills, employees.hire_date, employees.is_active, employees.created_at, employees.updated_at 
+FROM employees 
+WHERE employees.department_id = $1::INTEGER AND employees.is_active = true
+2025-12-16 10:07:50,403 INFO sqlalchemy.engine.Engine [generated in 0.00021s] (1,)
+INFO:     127.0.0.1:50060 - "GET /notifications HTTP/1.1" 200 OK
+2025-12-16 10:07:50,406 INFO sqlalchemy.engine.Engine ROLLBACK
+INFO:     127.0.0.1:57033 - "GET /employees HTTP/1.1" 200 OK
+2025-12-16 10:07:50,408 INFO sqlalchemy.engine.Engine ROLLBACK
+2025-12-16 10:07:50,414 INFO sqlalchemy.engine.Engine SELECT users.id AS users_id, users.username AS users_username, users.email AS users_email, users.hashed_password AS users_hashed_password, users.full_name AS users_full_name, users.role AS users_role, users.department_id AS users_department_id, users.is_active AS users_is_active, users.last_login AS users_last_login, users.created_at AS users_created_at, users.updated_at AS users_updated_at 
+FROM users 
+WHERE users.id IN ($1::INTEGER, $2::INTEGER)
+2025-12-16 10:07:50,414 INFO sqlalchemy.engine.Engine [generated in 0.00032s] (4, 8)
+2025-12-16 10:07:50,416 INFO sqlalchemy.engine.Engine BEGIN (implicit)
+2025-12-16 10:07:50,416 INFO sqlalchemy.engine.Engine SELECT users.id, users.username, users.email, users.hashed_password, users.full_name, users.role, users.department_id, users.is_active, users.last_login, users.created_at, users.updated_at 
+FROM users 
+WHERE users.username = $1::VARCHAR
+2025-12-16 10:07:50,416 INFO sqlalchemy.engine.Engine [cached since 0.05463s ago] ('manager1',)
+2025-12-16 10:07:50,417 INFO sqlalchemy.engine.Engine BEGIN (implicit)
+2025-12-16 10:07:50,417 INFO sqlalchemy.engine.Engine SELECT users.id, users.username, users.email, users.hashed_password, users.full_name, users.role, users.department_id, users.is_active, users.last_login, users.created_at, users.updated_at 
+FROM users 
+WHERE users.username = $1::VARCHAR
+2025-12-16 10:07:50,417 INFO sqlalchemy.engine.Engine [cached since 0.05568s ago] ('manager1',)
+2025-12-16 10:07:50,420 INFO sqlalchemy.engine.Engine SELECT users.id AS users_id, users.username AS users_username, users.email AS users_email, users.hashed_password AS users_hashed_password, users.full_name AS users_full_name, users.role AS users_role, users.department_id AS users_department_id, users.is_active AS users_is_active, users.last_login AS users_last_login, users.created_at AS users_created_at, users.updated_at AS users_updated_at 
+FROM users 
+WHERE users.id IN ($1::INTEGER)
+2025-12-16 10:07:50,421 INFO sqlalchemy.engine.Engine [generated in 0.00032s] (2,)
+2025-12-16 10:07:50,422 INFO sqlalchemy.engine.Engine SELECT employees.id, employees.employee_id, employees.first_name, employees.last_name, employees.email, employees.phone, employees.address, employees.department_id, employees.role_id, employees.user_id, employees.weekly_hours, employees.daily_max_hours, employees.shifts_per_week, employees.skills, employees.hire_date, employees.is_active, employees.created_at, employees.updated_at 
+FROM employees 
+WHERE employees.department_id = $1::INTEGER AND employees.is_active = true
+2025-12-16 10:07:50,422 INFO sqlalchemy.engine.Engine [cached since 0.01983s ago] (1,)
+2025-12-16 10:07:50,424 INFO sqlalchemy.engine.Engine SELECT notifications.id, notifications.user_id, notifications.title, notifications.message, notifications.notification_type, notifications.related_id, notifications.is_read, notifications.created_at 
+FROM notifications 
+WHERE notifications.user_id = $1::INTEGER ORDER BY notifications.created_at DESC
+2025-12-16 10:07:50,424 INFO sqlalchemy.engine.Engine [cached since 0.03149s ago] (2,)
+INFO:     127.0.0.1:50060 - "GET /notifications HTTP/1.1" 200 OK
+2025-12-16 10:07:50,426 INFO sqlalchemy.engine.Engine ROLLBACK
+INFO:     127.0.0.1:57033 - "GET /employees HTTP/1.1" 200 OK
+2025-12-16 10:07:50,427 INFO sqlalchemy.engine.Engine ROLLBACK
+INFO:     127.0.0.1:62261 - "GET /messages HTTP/1.1" 200 OK
+2025-12-16 10:07:50,428 INFO sqlalchemy.engine.Engine ROLLBACK
+2025-12-16 10:07:50,434 INFO sqlalchemy.engine.Engine BEGIN (implicit)
+2025-12-16 10:07:50,435 INFO sqlalchemy.engine.Engine SELECT users.id, users.username, users.email, users.hashed_password, users.full_name, users.role, users.department_id, users.is_active, users.last_login, users.created_at, users.updated_at 
+FROM users 
+WHERE users.username = $1::VARCHAR
+2025-12-16 10:07:50,435 INFO sqlalchemy.engine.Engine [cached since 0.07344s ago] ('manager1',)
+2025-12-16 10:07:50,440 INFO sqlalchemy.engine.Engine SELECT messages.id, messages.sender_id, messages.recipient_id, messages.department_id, messages.subject, messages.message, messages.is_read, messages.is_deleted_by_sender, messages.is_deleted_by_recipient, messages.parent_message_id, messages.created_at, messages.read_at 
+FROM messages 
+WHERE messages.sender_id = $1::INTEGER OR messages.recipient_id = $2::INTEGER AND messages.is_deleted_by_recipient = false OR messages.department_id = $3::INTEGER AND messages.is_deleted_by_recipient = false ORDER BY messages.created_at DESC
+2025-12-16 10:07:50,440 INFO sqlalchemy.engine.Engine [cached since 0.04007s ago] (2, 2, 1)
+2025-12-16 10:07:50,449 INFO sqlalchemy.engine.Engine SELECT users.id AS users_id, users.username AS users_username, users.email AS users_email, users.hashed_password AS users_hashed_password, users.full_name AS users_full_name, users.role AS users_role, users.department_id AS users_department_id, users.is_active AS users_is_active, users.last_login AS users_last_login, users.created_at AS users_created_at, users.updated_at AS users_updated_at 
+FROM users 
+WHERE users.id IN ($1::INTEGER, $2::INTEGER)
+2025-12-16 10:07:50,449 INFO sqlalchemy.engine.Engine [cached since 0.03475s ago] (4, 8)
+2025-12-16 10:07:50,460 INFO sqlalchemy.engine.Engine SELECT users.id AS users_id, users.username AS users_username, users.email AS users_email, users.hashed_password AS users_hashed_password, users.full_name AS users_full_name, users.role AS users_role, users.department_id AS users_department_id, users.is_active AS users_is_active, users.last_login AS users_last_login, users.created_at AS users_created_at, users.updated_at AS users_updated_at 
+FROM users 
+WHERE users.id IN ($1::INTEGER)
+2025-12-16 10:07:50,460 INFO sqlalchemy.engine.Engine [cached since 0.03957s ago] (2,)
+INFO:     127.0.0.1:62261 - "GET /messages HTTP/1.1" 200 OK
+2025-12-16 10:07:50,466 INFO sqlalchemy.engine.Engine ROLLBACK
+INFO:     127.0.0.1:62261 - "OPTIONS /messages/5 HTTP/1.1" 200 OK
+2025-12-16 10:07:54,978 INFO sqlalchemy.engine.Engine BEGIN (implicit)
+2025-12-16 10:07:54,979 INFO sqlalchemy.engine.Engine SELECT users.id, users.username, users.email, users.hashed_password, users.full_name, users.role, users.department_id, users.is_active, users.last_login, users.created_at, users.updated_at 
+FROM users 
+WHERE users.username = $1::VARCHAR
+2025-12-16 10:07:54,979 INFO sqlalchemy.engine.Engine [cached since 4.617s ago] ('manager1',)
+2025-12-16 10:07:54,982 INFO sqlalchemy.engine.Engine SELECT messages.id, messages.sender_id, messages.recipient_id, messages.department_id, messages.subject, messages.message, messages.is_read, messages.is_deleted_by_sender, messages.is_deleted_by_recipient, messages.parent_message_id, messages.created_at, messages.read_at 
+FROM messages 
+WHERE messages.id = $1::INTEGER
+2025-12-16 10:07:54,982 INFO sqlalchemy.engine.Engine [generated in 0.00016s] (5,)
+2025-12-16 10:07:54,986 INFO sqlalchemy.engine.Engine UPDATE messages SET is_deleted_by_sender=$1::BOOLEAN WHERE messages.id = $2::INTEGER
+2025-12-16 10:07:54,986 INFO sqlalchemy.engine.Engine [generated in 0.00016s] (True, 5)
+2025-12-16 10:07:54,989 INFO sqlalchemy.engine.Engine COMMIT
+INFO:     127.0.0.1:62261 - "DELETE /messages/5 HTTP/1.1" 200 OK
+2025-12-16 10:07:55,002 INFO sqlalchemy.engine.Engine BEGIN (implicit)
+2025-12-16 10:07:55,003 INFO sqlalchemy.engine.Engine SELECT users.id, users.username, users.email, users.hashed_password, users.full_name, users.role, users.department_id, users.is_active, users.last_login, users.created_at, users.updated_at 
+FROM users 
+WHERE users.username = $1::VARCHAR
+2025-12-16 10:07:55,003 INFO sqlalchemy.engine.Engine [cached since 4.641s ago] ('manager1',)
+2025-12-16 10:07:55,004 INFO sqlalchemy.engine.Engine BEGIN (implicit)
+2025-12-16 10:07:55,004 INFO sqlalchemy.engine.Engine SELECT users.id, users.username, users.email, users.hashed_password, users.full_name, users.role, users.department_id, users.is_active, users.last_login, users.created_at, users.updated_at 
+FROM users 
+WHERE users.username = $1::VARCHAR
+2025-12-16 10:07:55,004 INFO sqlalchemy.engine.Engine [cached since 4.643s ago] ('manager1',)
+2025-12-16 10:07:55,010 INFO sqlalchemy.engine.Engine SELECT employees.id, employees.employee_id, employees.first_name, employees.last_name, employees.email, employees.phone, employees.address, employees.department_id, employees.role_id, employees.user_id, employees.weekly_hours, employees.daily_max_hours, employees.shifts_per_week, employees.skills, employees.hire_date, employees.is_active, employees.created_at, employees.updated_at 
+FROM employees 
+WHERE employees.department_id = $1::INTEGER AND employees.is_active = true
+2025-12-16 10:07:55,010 INFO sqlalchemy.engine.Engine [cached since 4.608s ago] (1,)
+2025-12-16 10:07:55,011 INFO sqlalchemy.engine.Engine SELECT messages.id, messages.sender_id, messages.recipient_id, messages.department_id, messages.subject, messages.message, messages.is_read, messages.is_deleted_by_sender, messages.is_deleted_by_recipient, messages.parent_message_id, messages.created_at, messages.read_at 
+FROM messages 
+WHERE messages.sender_id = $1::INTEGER OR messages.recipient_id = $2::INTEGER AND messages.is_deleted_by_recipient = false OR messages.department_id = $3::INTEGER AND messages.is_deleted_by_recipient = false ORDER BY messages.created_at DESC
+2025-12-16 10:07:55,012 INFO sqlalchemy.engine.Engine [cached since 4.611s ago] (2, 2, 1)
+INFO:     127.0.0.1:57033 - "GET /employees HTTP/1.1" 200 OK
+2025-12-16 10:07:55,016 INFO sqlalchemy.engine.Engine ROLLBACK
+2025-12-16 10:07:55,016 INFO sqlalchemy.engine.Engine SELECT users.id AS users_id, users.username AS users_username, users.email AS users_email, users.hashed_password AS users_hashed_password, users.full_name AS users_full_name, users.role AS users_role, users.department_id AS users_department_id, users.is_active AS users_is_active, users.last_login AS users_last_login, users.created_at AS users_created_at, users.updated_at AS users_updated_at 
+FROM users 
+WHERE users.id IN ($1::INTEGER, $2::INTEGER)
+2025-12-16 10:07:55,016 INFO sqlalchemy.engine.Engine [cached since 4.602s ago] (4, 8)
+2025-12-16 10:07:55,019 INFO sqlalchemy.engine.Engine SELECT users.id AS users_id, users.username AS users_username, users.email AS users_email, users.hashed_password AS users_hashed_password, users.full_name AS users_full_name, users.role AS users_role, users.department_id AS users_department_id, users.is_active AS users_is_active, users.last_login AS users_last_login, users.created_at AS users_created_at, users.updated_at AS users_updated_at 
+FROM users 
+WHERE users.id IN ($1::INTEGER)
+2025-12-16 10:07:55,019 INFO sqlalchemy.engine.Engine [cached since 4.599s ago] (2,)
+INFO:     127.0.0.1:62261 - "GET /messages HTTP/1.1" 200 OK
+2025-12-16 10:07:55,022 INFO sqlalchemy.engine.Engine ROLLBACK
+2025-12-16 10:07:57,894 INFO sqlalchemy.engine.Engine BEGIN (implicit)
+2025-12-16 10:07:57,895 INFO sqlalchemy.engine.Engine SELECT users.id, users.username, users.email, users.hashed_password, users.full_name, users.role, users.department_id, users.is_active, users.last_login, users.created_at, users.updated_at 
+FROM users 
+WHERE users.username = $1::VARCHAR
+2025-12-16 10:07:57,895 INFO sqlalchemy.engine.Engine [cached since 7.533s ago] ('manager1',)
+2025-12-16 10:07:57,900 INFO sqlalchemy.engine.Engine SELECT messages.id, messages.sender_id, messages.recipient_id, messages.department_id, messages.subject, messages.message, messages.is_read, messages.is_deleted_by_sender, messages.is_deleted_by_recipient, messages.parent_message_id, messages.created_at, messages.read_at 
+FROM messages 
+WHERE messages.id = $1::INTEGER
+2025-12-16 10:07:57,900 INFO sqlalchemy.engine.Engine [cached since 2.918s ago] (5,)
+2025-12-16 10:07:57,902 INFO sqlalchemy.engine.Engine COMMIT
+INFO:     127.0.0.1:62261 - "DELETE /messages/5 HTTP/1.1" 200 OK
+2025-12-16 10:07:57,915 INFO sqlalchemy.engine.Engine BEGIN (implicit)
+2025-12-16 10:07:57,915 INFO sqlalchemy.engine.Engine SELECT users.id, users.username, users.email, users.hashed_password, users.full_name, users.role, users.department_id, users.is_active, users.last_login, users.created_at, users.updated_at 
+FROM users 
+WHERE users.username = $1::VARCHAR
+2025-12-16 10:07:57,915 INFO sqlalchemy.engine.Engine [cached since 7.554s ago] ('manager1',)
+2025-12-16 10:07:57,916 INFO sqlalchemy.engine.Engine BEGIN (implicit)
+2025-12-16 10:07:57,916 INFO sqlalchemy.engine.Engine SELECT users.id, users.username, users.email, users.hashed_password, users.full_name, users.role, users.department_id, users.is_active, users.last_login, users.created_at, users.updated_at 
+FROM users 
+WHERE users.username = $1::VARCHAR
+2025-12-16 10:07:57,916 INFO sqlalchemy.engine.Engine [cached since 7.555s ago] ('manager1',)
+2025-12-16 10:07:57,919 INFO sqlalchemy.engine.Engine SELECT employees.id, employees.employee_id, employees.first_name, employees.last_name, employees.email, employees.phone, employees.address, employees.department_id, employees.role_id, employees.user_id, employees.weekly_hours, employees.daily_max_hours, employees.shifts_per_week, employees.skills, employees.hire_date, employees.is_active, employees.created_at, employees.updated_at 
+FROM employees 
+WHERE employees.department_id = $1::INTEGER AND employees.is_active = true
+2025-12-16 10:07:57,919 INFO sqlalchemy.engine.Engine [cached since 7.517s ago] (1,)
+2025-12-16 10:07:57,920 INFO sqlalchemy.engine.Engine SELECT messages.id, messages.sender_id, messages.recipient_id, messages.department_id, messages.subject, messages.message, messages.is_read, messages.is_deleted_by_sender, messages.is_deleted_by_recipient, messages.parent_message_id, messages.created_at, messages.read_at 
+FROM messages 
+WHERE messages.sender_id = $1::INTEGER OR messages.recipient_id = $2::INTEGER AND messages.is_deleted_by_recipient = false OR messages.department_id = $3::INTEGER AND messages.is_deleted_by_recipient = false ORDER BY messages.created_at DESC
+2025-12-16 10:07:57,920 INFO sqlalchemy.engine.Engine [cached since 7.52s ago] (2, 2, 1)
+2025-12-16 10:07:57,922 INFO sqlalchemy.engine.Engine SELECT users.id AS users_id, users.username AS users_username, users.email AS users_email, users.hashed_password AS users_hashed_password, users.full_name AS users_full_name, users.role AS users_role, users.department_id AS users_department_id, users.is_active AS users_is_active, users.last_login AS users_last_login, users.created_at AS users_created_at, users.updated_at AS users_updated_at 
+FROM users 
+WHERE users.id IN ($1::INTEGER, $2::INTEGER)
+2025-12-16 10:07:57,922 INFO sqlalchemy.engine.Engine [cached since 7.508s ago] (4, 8)
+INFO:     127.0.0.1:57033 - "GET /employees HTTP/1.1" 200 OK
+2025-12-16 10:07:57,924 INFO sqlalchemy.engine.Engine ROLLBACK
+2025-12-16 10:07:57,928 INFO sqlalchemy.engine.Engine SELECT users.id AS users_id, users.username AS users_username, users.email AS users_email, users.hashed_password AS users_hashed_password, users.full_name AS users_full_name, users.role AS users_role, users.department_id AS users_department_id, users.is_active AS users_is_active, users.last_login AS users_last_login, users.created_at AS users_created_at, users.updated_at AS users_updated_at 
+FROM users 
+WHERE users.id IN ($1::INTEGER)
+2025-12-16 10:07:57,929 INFO sqlalchemy.engine.Engine [cached since 7.509s ago] (2,)
+INFO:     127.0.0.1:62261 - "GET /messages HTTP/1.1" 200 OK
+2025-12-16 10:07:57,934 INFO sqlalchemy.engine.Engine ROLLBACK
+2025-12-16 10:08:03,957 INFO sqlalchemy.engine.Engine BEGIN (implicit)
+2025-12-16 10:08:03,957 INFO sqlalchemy.engine.Engine SELECT users.id, users.username, users.email, users.hashed_password, users.full_name, users.role, users.department_id, users.is_active, users.last_login, users.created_at, users.updated_at 
+FROM users 
+WHERE users.username = $1::VARCHAR
+2025-12-16 10:08:03,957 INFO sqlalchemy.engine.Engine [cached since 13.6s ago] ('manager1',)
+2025-12-16 10:08:03,960 INFO sqlalchemy.engine.Engine INSERT INTO messages (sender_id, recipient_id, department_id, subject, message, is_read, is_deleted_by_sender, is_deleted_by_recipient, parent_message_id, created_at, read_at) VALUES ($1::INTEGER, $2::INTEGER, $3::INTEGER, $4::VARCHAR, $5::VARCHAR, $6::BOOLEAN, $7::BOOLEAN, $8::BOOLEAN, $9::INTEGER, $10::TIMESTAMP WITHOUT TIME ZONE, $11::TIMESTAMP WITHOUT TIME ZONE) RETURNING messages.id
+2025-12-16 10:08:03,960 INFO sqlalchemy.engine.Engine [generated in 0.00021s] (2, 5, None, 'h', 'h', False, False, False, None, datetime.datetime(2025, 12, 16, 1, 8, 3, 960461), None)
+2025-12-16 10:08:03,963 INFO sqlalchemy.engine.Engine COMMIT
+2025-12-16 10:08:03,966 INFO sqlalchemy.engine.Engine BEGIN (implicit)
+2025-12-16 10:08:03,967 INFO sqlalchemy.engine.Engine SELECT messages.id, messages.sender_id, messages.recipient_id, messages.department_id, messages.subject, messages.message, messages.is_read, messages.is_deleted_by_sender, messages.is_deleted_by_recipient, messages.parent_message_id, messages.created_at, messages.read_at 
+FROM messages 
+WHERE messages.id = $1::INTEGER
+2025-12-16 10:08:03,967 INFO sqlalchemy.engine.Engine [generated in 0.00011s] (6,)
+2025-12-16 10:08:03,970 INFO sqlalchemy.engine.Engine SELECT users.id AS users_id, users.username AS users_username, users.email AS users_email, users.hashed_password AS users_hashed_password, users.full_name AS users_full_name, users.role AS users_role, users.department_id AS users_department_id, users.is_active AS users_is_active, users.last_login AS users_last_login, users.created_at AS users_created_at, users.updated_at AS users_updated_at 
+FROM users 
+WHERE users.id = $1::INTEGER
+2025-12-16 10:08:03,970 INFO sqlalchemy.engine.Engine [generated in 0.00017s] (5,)
+2025-12-16 10:08:03,971 INFO sqlalchemy.engine.Engine ROLLBACK
+INFO:     127.0.0.1:63117 - "POST /messages HTTP/1.1" 500 Internal Server Error
+ERROR:    Exception in ASGI application
+Traceback (most recent call last):
+  File "/home/tw10548/.miniconda/lib/python3.13/site-packages/uvicorn/protocols/http/httptools_impl.py", line 409, in run_asgi
+    result = await app(  # type: ignore[func-returns-value]
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        self.scope, self.receive, self.send
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "/home/tw10548/.miniconda/lib/python3.13/site-packages/uvicorn/middleware/proxy_headers.py", line 60, in __call__
+    return await self.app(scope, receive, send)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/tw10548/.miniconda/lib/python3.13/site-packages/fastapi/applications.py", line 1139, in __call__
+    await super().__call__(scope, receive, send)
+  File "/home/tw10548/.miniconda/lib/python3.13/site-packages/starlette/applications.py", line 107, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "/home/tw10548/.miniconda/lib/python3.13/site-packages/starlette/middleware/errors.py", line 186, in __call__
+    raise exc
+  File "/home/tw10548/.miniconda/lib/python3.13/site-packages/starlette/middleware/errors.py", line 164, in __call__
+    await self.app(scope, receive, _send)
+  File "/home/tw10548/.miniconda/lib/python3.13/site-packages/starlette/middleware/cors.py", line 93, in __call__
+    await self.simple_response(scope, receive, send, request_headers=headers)
+  File "/home/tw10548/.miniconda/lib/python3.13/site-packages/starlette/middleware/cors.py", line 144, in simple_response
+    await self.app(scope, receive, send)
+  File "/home/tw10548/.miniconda/lib/python3.13/site-packages/starlette/middleware/exceptions.py", line 63, in __call__
+    await wrap_app_handling_exceptions(self.app, conn)(scope, receive, send)
+  File "/home/tw10548/.miniconda/lib/python3.13/site-packages/starlette/_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "/home/tw10548/.miniconda/lib/python3.13/site-packages/starlette/_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "/home/tw10548/.miniconda/lib/python3.13/site-packages/fastapi/middleware/asyncexitstack.py", line 18, in __call__
+    await self.app(scope, receive, send)
+  File "/home/tw10548/.miniconda/lib/python3.13/site-packages/starlette/routing.py", line 716, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "/home/tw10548/.miniconda/lib/python3.13/site-packages/starlette/routing.py", line 736, in app
+    await route.handle(scope, receive, send)
+  File "/home/tw10548/.miniconda/lib/python3.13/site-packages/starlette/routing.py", line 290, in handle
+    await self.app(scope, receive, send)
+  File "/home/tw10548/.miniconda/lib/python3.13/site-packages/fastapi/routing.py", line 120, in app
+    await wrap_app_handling_exceptions(app, request)(scope, receive, send)
+  File "/home/tw10548/.miniconda/lib/python3.13/site-packages/starlette/_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "/home/tw10548/.miniconda/lib/python3.13/site-packages/starlette/_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "/home/tw10548/.miniconda/lib/python3.13/site-packages/fastapi/routing.py", line 106, in app
+    response = await f(request)
+               ^^^^^^^^^^^^^^^^
+  File "/home/tw10548/.miniconda/lib/python3.13/site-packages/fastapi/routing.py", line 452, in app
+    content = await serialize_response(
+              ^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<10 lines>...
+    )
+    ^
+  File "/home/tw10548/.miniconda/lib/python3.13/site-packages/fastapi/routing.py", line 278, in serialize_response
+    raise ResponseValidationError(
+    ...<3 lines>...
+    )
+fastapi.exceptions.ResponseValidationError: 1 validation error:
+  {'type': 'get_attribute_error', 'loc': ('response', 'recipient'), 'msg': "Error extracting attribute: MissingGreenlet: greenlet_spawn has not been called; can't call await_only() here. Was IO attempted in an unexpected place? (Background on this error at: https://sqlalche.me/e/20/xd2s)", 'input': <app.models.Message object at 0x7595266eb1e0>, 'ctx': {'error': "MissingGreenlet: greenlet_spawn has not been called; can't call await_only() here. Was IO attempted in an unexpected place? (Background on this error at: https://sqlalche.me/e/20/xd2s)"}}
+
+  File "/home/tw10548/major2/backend/app/main.py", line 1171, in send_message
+    POST /messages
+2025-12-16 10:08:20,195 INFO sqlalchemy.engine.Engine BEGIN (implicit)
+2025-12-16 10:08:20,196 INFO sqlalchemy.engine.Engine SELECT users.id, users.username, users.email, users.hashed_password, users.full_name, users.role, users.department_id, users.is_active, users.last_login, users.created_at, users.updated_at 
+FROM users 
+WHERE users.username = $1::VARCHAR
+2025-12-16 10:08:20,196 INFO sqlalchemy.engine.Engine [cached since 29.83s ago] ('manager1',)
+2025-12-16 10:08:20,199 INFO sqlalchemy.engine.Engine SELECT notifications.id, notifications.user_id, notifications.title, notifications.message, notifications.notification_type, notifications.related_id, notifications.is_read, notifications.created_at 
+FROM notifications 
+WHERE notifications.user_id = $1::INTEGER ORDER BY notifications.created_at DESC
+2025-12-16 10:08:20,200 INFO sqlalchemy.engine.Engine [cached since 29.81s ago] (2,)
+INFO:     127.0.0.1:62388 - "GET /notifications HTTP/1.1" 200 OK
+2025-12-16 10:08:20,201 INFO sqlalchemy.engine.Engine ROLLBACK
+2025-12-16 10:08:49,893 INFO sqlalchemy.engine.Engine BEGIN (implicit)
+2025-12-16 10:08:49,894 INFO sqlalchemy.engine.Engine SELECT users.id, users.username, users.email, users.hashed_password, users.full_name, users.role, users.department_id, users.is_active, users.last_login, users.created_at, users.updated_at 
+FROM users 
+WHERE users.username = $1::VARCHAR
+2025-12-16 10:08:49,894 INFO sqlalchemy.engine.Engine [cached since 59.53s ago] ('manager1',)
+2025-12-16 10:08:49,896 INFO sqlalchemy.engine.Engine SELECT notifications.id, notifications.user_id, notifications.title, notifications.message, notifications.notification_type, notifications.related_id, notifications.is_read, notifications.created_at 
+FROM notifications 
+WHERE notifications.user_id = $1::INTEGER ORDER BY notifications.created_at DESC
+2025-12-16 10:08:49,897 INFO sqlalchemy.engine.Engine [cached since 59.5s ago] (2,)
+INFO:     127.0.0.1:60516 - "GET /notifications HTTP/1.1" 200 OK
+2025-12-16 10:08:49,899 INFO sqlalchemy.engine.Engine ROLLBACK
+2025-12-16 10:09:20,207 INFO sqlalchemy.engine.Engine BEGIN (implicit)
+2025-12-16 10:09:20,208 INFO sqlalchemy.engine.Engine SELECT users.id, users.username, users.email, users.hashed_password, users.full_name, users.role, users.department_id, users.is_active, users.last_login, users.created_at, users.updated_at 
+FROM users 
+WHERE users.username = $1::VARCHAR
+2025-12-16 10:09:20,208 INFO sqlalchemy.engine.Engine [cached since 89.85s ago] ('manager1',)
+2025-12-16 10:09:20,212 INFO sqlalchemy.engine.Engine SELECT notifications.id, notifications.user_id, notifications.title, notifications.message, notifications.notification_type, notifications.related_id, notifications.is_read, notifications.created_at 
+FROM notifications 
+WHERE notifications.user_id = $1::INTEGER ORDER BY notifications.created_at DESC
+2025-12-16 10:09:20,212 INFO sqlalchemy.engine.Engine [cached since 89.82s ago] (2,)
+INFO:     127.0.0.1:56614 - "GET /notifications HTTP/1.1" 200 OK
+2025-12-16 10:09:20,215 INFO sqlalchemy.engine.Engine ROLLBACK
+2025-12-16 10:09:49,900 INFO sqlalchemy.engine.Engine BEGIN (implicit)
+2025-12-16 10:09:49,900 INFO sqlalchemy.engine.Engine SELECT users.id, users.username, users.email, users.hashed_password, users.full_name, users.role, users.department_id, users.is_active, users.last_login, users.created_at, users.updated_at 
+FROM users 
+WHERE users.username = $1::VARCHAR
+2025-12-16 10:09:49,900 INFO sqlalchemy.engine.Engine [cached since 119.5s ago] ('manager1',)
+2025-12-16 10:09:49,903 INFO sqlalchemy.engine.Engine SELECT notifications.id, notifications.user_id, notifications.title, notifications.message, notifications.notification_type, notifications.related_id, notifications.is_read, notifications.created_at 
+FROM notifications 
+WHERE notifications.user_id = $1::INTEGER ORDER BY notifications.created_at DESC
+2025-12-16 10:09:49,903 INFO sqlalchemy.engine.Engine [cached since 119.5s ago] (2,)
+INFO:     127.0.0.1:49666 - "GET /notifications HTTP/1.1" 200 OK
+2025-12-16 10:09:49,905 INFO sqlalchemy.engine.Engine ROLLBACK
+2025-12-16 10:10:20,197 INFO sqlalchemy.engine.Engine BEGIN (implicit)
+2025-12-16 10:10:20,197 INFO sqlalchemy.engine.Engine SELECT users.id, users.username, users.email, users.hashed_password, users.full_name, users.role, users.department_id, users.is_active, users.last_login, users.created_at, users.updated_at 
+FROM users 
+WHERE users.username = $1::VARCHAR
+2025-12-16 10:10:20,197 INFO sqlalchemy.engine.Engine [cached since 149.8s ago] ('manager1',)
+2025-12-16 10:10:20,200 INFO sqlalchemy.engine.Engine SELECT notifications.id, notifications.user_id, notifications.title, notifications.message, notifications.notification_type, notifications.related_id, notifications.is_read, notifications.created_at 
+FROM notifications 
+WHERE notifications.user_id = $1::INTEGER ORDER BY notifications.created_at DESC
+2025-12-16 10:10:20,200 INFO sqlalchemy.engine.Engine [cached since 149.8s ago] (2,)
+INFO:     127.0.0.1:65221 - "GET /notifications HTTP/1.1" 200 OK
+2025-12-16 10:10:20,201 INFO sqlalchemy.engine.Engine ROLLBACK
+2025-12-16 10:10:49,887 INFO sqlalchemy.engine.Engine BEGIN (implicit)
+2025-12-16 10:10:49,888 INFO sqlalchemy.engine.Engine SELECT users.id, users.username, users.email, users.hashed_password, users.full_name, users.role, users.department_id, users.is_active, users.last_login, users.created_at, users.updated_at 
+FROM users 
+WHERE users.username = $1::VARCHAR
+2025-12-16 10:10:49,888 INFO sqlalchemy.engine.Engine [cached since 179.5s ago] ('manager1',)
+2025-12-16 10:10:49,891 INFO sqlalchemy.engine.Engine SELECT notifications.id, notifications.user_id, notifications.title, notifications.message, notifications.notification_type, notifications.related_id, notifications.is_read, notifications.created_at 
+FROM notifications 
+WHERE notifications.user_id = $1::INTEGER ORDER BY notifications.created_at DESC
+2025-12-16 10:10:49,891 INFO sqlalchemy.engine.Engine [cached since 179.5s ago] (2,)
+INFO:     127.0.0.1:53028 - "GET /notifications HTTP/1.1" 200 OK
+2025-12-16 10:10:49,892 INFO sqlalchemy.engine.Engine ROLLBACK

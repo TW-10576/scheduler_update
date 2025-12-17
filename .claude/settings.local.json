@@ -1,0 +1,26 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(wc:*)",
+      "mcp__ide__getDiagnostics",
+      "Bash(tree:*)",
+      "Bash(find:*)",
+      "Bash(npm run build:*)",
+      "Bash(npm install:*)",
+      "Bash(cat:*)",
+      "Bash(grep:*)",
+      "Bash(chmod:*)",
+      "Bash(docker compose:*)",
+      "Bash(pip install:*)",
+      "Bash(python -c:*)",
+      "Bash(python:*)",
+      "Bash(psql:*)",
+      "Bash(PGPASSWORD=postgres123 psql -h localhost -U postgres -d shift_scheduler -c \"DROP SCHEMA public CASCADE; CREATE SCHEMA public;\")",
+      "Bash(PGPASSWORD=postgres123 psql:*)",
+      "Bash(pkill:*)",
+      "Bash(conda list:*)",
+      "Bash(timeout 60 python:*)",
+      "Bash(/tmp/consistency_check.sh)"
+    ]
+  }
+}
