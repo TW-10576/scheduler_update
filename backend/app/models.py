@@ -115,6 +115,13 @@ class Employee(Base):
     overtime_tracking = relationship("OvertimeTracking", back_populates="employee", cascade="all, delete-orphan")
     overtime_requests = relationship("OvertimeRequest", back_populates="employee", cascade="all, delete-orphan")
     overtime_worked = relationship("OvertimeWorked", back_populates="employee", cascade="all, delete-orphan")
+    # New relationships for wage and leave management
+    wage_config = relationship("EmployeeWageConfig", back_populates="employee", uselist=False, cascade="all, delete-orphan")
+    wage_calculations = relationship("WageCalculation", back_populates="employee", cascade="all, delete-orphan")
+    leave_balance = relationship("LeaveBalance", back_populates="employee", cascade="all, delete-orphan")
+    leave_reminders = relationship("LeaveReminder", back_populates="employee", cascade="all, delete-orphan")
+    night_work = relationship("LateNightWork", back_populates="employee", cascade="all, delete-orphan")
+    attendance_summaries = relationship("AttendanceSummary", back_populates="employee", cascade="all, delete-orphan")
 
 
 class Role(Base):
@@ -227,6 +234,8 @@ class Attendance(Base):
     out_status = Column(String(20))
     worked_hours = Column(Float, default=0)
     overtime_hours = Column(Float, default=0)
+    night_hours = Column(Float, default=0)  # Hours worked between 22:00 and 06:00
+    night_allowance = Column(Float, default=0)  # Calculated night shift allowance
     break_minutes = Column(Integer, default=0)
     notes = Column(Text)
     created_at = Column(DateTime, default=datetime.utcnow)
@@ -374,3 +383,217 @@ class OvertimeWorked(Base):
 
     # Relationships
     employee = relationship("Employee", back_populates="overtime_worked")
+
+
+class LateNightWork(Base):
+    """Track late-night work hours (22:00 onwards) separately from overtime"""
+    __tablename__ = "late_night_work"
+
+    id = Column(Integer, primary_key=True, index=True)
+    employee_id = Column(Integer, ForeignKey('employees.id', name='fk_night_employee'), nullable=False)
+    work_date = Column(Date, nullable=False, index=True)
+    night_start_time = Column(String(5), nullable=False)  # HH:MM format (usually 22:00 or later)
+    night_end_time = Column(String(5), nullable=True)  # HH:MM format
+    night_hours = Column(Float, nullable=False)  # Hours worked between 22:00 and next day 06:00
+    night_allowance_rate = Column(Float, default=1.5)  # 1.5x or 2x multiplier
+    night_allowance_amount = Column(Float, default=0)  # Calculated allowance (hourly_rate * hours * multiplier)
+    approval_status = Column(SQLEnum(OvertimeStatus), default=OvertimeStatus.PENDING)
+    notes = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    # Relationships
+    employee = relationship("Employee")
+
+
+class LeaveBalance(Base):
+    """Track cumulative leave balance for employees"""
+    __tablename__ = "leave_balance"
+
+    id = Column(Integer, primary_key=True, index=True)
+    employee_id = Column(Integer, ForeignKey('employees.id', name='fk_leave_balance_employee'), nullable=False)
+    year = Column(Integer, nullable=False)  # Year of the balance
+    total_paid_leave = Column(Float, default=0)  # Total entitled paid leave for the year
+    used_paid_leave = Column(Float, default=0)  # Used paid leave
+    remaining_paid_leave = Column(Float, default=0)  # Remaining paid leave
+    total_unpaid_leave = Column(Float, default=0)  # Total unpaid leave taken
+    last_updated = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    # Relationships
+    employee = relationship("Employee")
+
+
+class LeaveReminder(Base):
+    """Track paid leave reminders sent to employees"""
+    __tablename__ = "leave_reminders"
+
+    id = Column(Integer, primary_key=True, index=True)
+    employee_id = Column(Integer, ForeignKey('employees.id', name='fk_reminder_employee'), nullable=False)
+    reminder_date = Column(DateTime, nullable=False)  # When the reminder was sent
+    remaining_days_at_time = Column(Float, nullable=False)  # Remaining paid leave days at time of reminder
+    reminder_type = Column(String(50), default='low_balance')  # low_balance, mid_year, year_end
+    is_acknowledged = Column(Boolean, default=False)
+    acknowledgment_date = Column(DateTime, nullable=True)
+    action_taken = Column(Text, nullable=True)  # What action employee took (e.g., "Requested 2 days leave")
+    notes = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    # Relationships
+    employee = relationship("Employee")
+
+
+class EmployeeWageConfig(Base):
+    """Employee wage configuration for part-time wage calculations"""
+    __tablename__ = "employee_wage_config"
+
+    id = Column(Integer, primary_key=True, index=True)
+    employee_id = Column(Integer, ForeignKey('employees.id', name='fk_wage_config_employee'), nullable=False, unique=True)
+    hourly_rate = Column(Float, nullable=False, default=0)  # Base hourly rate
+    regular_shift_premium = Column(Float, default=1.0)  # Multiplier for regular shifts (1.0 = no premium)
+    overtime_multiplier = Column(Float, default=1.5)  # Overtime payment multiplier (1.5x, 2x, etc.)
+    night_shift_multiplier = Column(Float, default=1.5)  # Night shift allowance multiplier (22:00+)
+    holiday_multiplier = Column(Float, default=2.0)  # Holiday work multiplier
+    is_part_time = Column(Boolean, default=True)
+    is_active = Column(Boolean, default=True)
+    effective_from = Column(Date, nullable=False)
+    effective_to = Column(Date, nullable=True)
+    notes = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    # Relationships
+    employee = relationship("Employee")
+
+
+class PayrollCycle(Base):
+    """Track payroll cycles: 15-day closing and 18-day wage confirmation"""
+    __tablename__ = "payroll_cycles"
+
+    id = Column(Integer, primary_key=True, index=True)
+    cycle_number = Column(Integer, nullable=False)  # 1-24 for 15-day cycles in a year
+    year = Column(Integer, nullable=False)
+    start_date = Column(Date, nullable=False)  # First day of 15-day period
+    end_date = Column(Date, nullable=False)  # Last day of 15-day period
+    closing_date = Column(Date, nullable=True)  # 15-day closing date (data verification deadline)
+    confirmation_date = Column(Date, nullable=True)  # 18-day wage confirmation date (wage payment confirmation)
+    is_closed = Column(Boolean, default=False)
+    is_confirmed = Column(Boolean, default=False)
+    total_employees = Column(Integer, default=0)
+    processed_employees = Column(Integer, default=0)
+    confirmed_employees = Column(Integer, default=0)
+    notes = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+class WageCalculation(Base):
+    """Store calculated wages for each payroll cycle"""
+    __tablename__ = "wage_calculations"
+
+    id = Column(Integer, primary_key=True, index=True)
+    employee_id = Column(Integer, ForeignKey('employees.id', name='fk_wage_calc_employee'), nullable=False)
+    payroll_cycle_id = Column(Integer, ForeignKey('payroll_cycles.id', name='fk_wage_calc_cycle'), nullable=False)
+    
+    # Hours breakdown
+    regular_hours = Column(Float, default=0)  # Regular work hours
+    overtime_hours = Column(Float, default=0)  # Overtime hours (8+ hours/day)
+    night_hours = Column(Float, default=0)  # Late-night work hours (22:00+)
+    break_hours = Column(Float, default=0)  # Break/unpaid hours
+    total_worked_hours = Column(Float, default=0)  # Total hours worked
+    
+    # Days breakdown
+    working_days = Column(Integer, default=0)  # Days actually worked
+    leave_days = Column(Float, default=0)  # Leave days taken
+    paid_leave_days = Column(Float, default=0)  # Paid leave days
+    unpaid_leave_days = Column(Float, default=0)  # Unpaid leave days
+    
+    # Wage calculations
+    base_wage = Column(Float, default=0)  # Regular hours * hourly rate
+    overtime_wage = Column(Float, default=0)  # Overtime hours * hourly rate * multiplier
+    night_shift_wage = Column(Float, default=0)  # Night hours * hourly rate * multiplier
+    holiday_wage = Column(Float, default=0)  # Holiday work wage
+    
+    # Allowances and deductions
+    shift_premium = Column(Float, default=0)  # Any shift-specific bonuses
+    meal_allowance = Column(Float, default=0)
+    transportation_allowance = Column(Float, default=0)
+    other_allowance = Column(Float, default=0)
+    
+    total_allowance = Column(Float, default=0)  # Sum of all allowances
+    total_deduction = Column(Float, default=0)  # Sum of all deductions
+    net_wage = Column(Float, default=0)  # Total wage to be paid
+    
+    # Status tracking
+    calculation_date = Column(DateTime, default=datetime.utcnow)
+    closing_verified = Column(Boolean, default=False)  # Verified during 15-day closing
+    wage_confirmed = Column(Boolean, default=False)  # Confirmed during 18-day confirmation
+    is_paid = Column(Boolean, default=False)
+    payment_date = Column(DateTime, nullable=True)
+    
+    # Notes and references
+    notes = Column(Text, nullable=True)
+    calculation_details = Column(JSON, default=dict)  # Detailed calculation breakdown
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    # Relationships
+    employee = relationship("Employee")
+    payroll_cycle = relationship("PayrollCycle")
+
+
+class AttendanceSummary(Base):
+    """Centralized comprehensive attendance data for employees"""
+    __tablename__ = "attendance_summary"
+
+    id = Column(Integer, primary_key=True, index=True)
+    employee_id = Column(Integer, ForeignKey('employees.id', name='fk_att_summary_employee'), nullable=False)
+    
+    # Period identification
+    period_type = Column(String(20), nullable=False)  # 'daily', 'weekly', 'monthly', 'yearly'
+    period_date = Column(Date, nullable=False)  # Start date of period
+    period_end_date = Column(Date, nullable=True)  # End date of period (for weekly/monthly/yearly)
+    
+    # Comprehensive attendance data
+    total_days_in_period = Column(Integer, default=0)  # Calendar days in period
+    working_days = Column(Integer, default=0)  # Days employee was scheduled
+    days_worked = Column(Integer, default=0)  # Days actually worked
+    days_absent = Column(Integer, default=0)  # Days absent without leave
+    
+    # Hours breakdown
+    total_scheduled_hours = Column(Float, default=0)  # Total hours scheduled
+    total_worked_hours = Column(Float, default=0)  # Total hours actually worked
+    regular_hours = Column(Float, default=0)  # Regular 8-hour shift hours
+    overtime_hours = Column(Float, default=0)  # Overtime hours (8+ per day)
+    night_hours = Column(Float, default=0)  # Late-night work hours
+    break_hours = Column(Float, default=0)  # Break time
+    
+    # Leave breakdown
+    paid_leave_days = Column(Float, default=0)
+    half_day_leave = Column(Float, default=0)  # Half-day leaves (counted as 0.5)
+    compensatory_leave = Column(Float, default=0)  # Comp leave used
+    unpaid_leave_days = Column(Float, default=0)
+    total_leave_days = Column(Float, default=0)
+    
+    # Attendance status
+    on_time_count = Column(Integer, default=0)
+    slightly_late_count = Column(Integer, default=0)
+    late_count = Column(Integer, default=0)
+    very_late_count = Column(Integer, default=0)
+    on_time_percentage = Column(Float, default=0)
+    
+    # Approval and verification
+    approval_status = Column(String(20), default='pending')  # pending, approved, rejected
+    verified_by_manager = Column(Boolean, default=False)
+    manager_verification_date = Column(DateTime, nullable=True)
+    approved_by_admin = Column(Boolean, default=False)
+    admin_approval_date = Column(DateTime, nullable=True)
+    
+    # Notes and metadata
+    notes = Column(Text, nullable=True)
+    summary_data = Column(JSON, default=dict)  # Additional summary data
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    # Relationships
+    employee = relationship("Employee")

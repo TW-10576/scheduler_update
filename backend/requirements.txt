@@ -10,4 +10,5 @@ python-multipart>=0.0.6
 pydantic[email]>=2.5.0
 pydantic-settings>=2.1.0
 ortools>=9.10.0
-python-dateutil>=2.8.2
+python-dateutil>=2.8.2apscheduler>=3.10.4
+openpyxl>=3.10.0

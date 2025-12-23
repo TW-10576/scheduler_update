@@ -27,7 +27,9 @@ from app.models import (
     User, Department, Manager, Employee, Role, Schedule, LeaveRequest,
     CheckInOut, Message, Notification,
     UserType, LeaveStatus, Attendance, Unavailability, Shift,
-    OvertimeTracking, OvertimeRequest, OvertimeWorked, OvertimeStatus
+    OvertimeTracking, OvertimeRequest, OvertimeWorked, OvertimeStatus,
+    LateNightWork, LeaveBalance, LeaveReminder, EmployeeWageConfig,
+    PayrollCycle, WageCalculation, AttendanceSummary
 )
 from app.schemas import *
 from app.auth import (
@@ -35,6 +37,9 @@ from app.auth import (
     get_current_active_user, require_admin, require_manager, require_employee
 )
 from app.schedule_generator import ShiftScheduleGenerator
+from app.attendance_service import AttendanceService
+from app.leave_reminder_service import LeaveReminderService
+from app.wage_calculation_service import WageCalculationService
 
 app = FastAPI(
     title="Shift Scheduler V5.1 API",
@@ -1279,6 +1284,13 @@ async def check_out(
                 attendance.out_time = check_in.check_out_time.strftime("%H:%M") if check_in.check_out_time else None
                 attendance.schedule_id = check_in.schedule_id  # Ensure schedule_id is set
             
+            # ==================== CHECK IF EMPLOYEE IS ON APPROVED LEAVE ====================
+            # If employee has an approved leave for today, mark attendance status as "leave"
+            from app.helpers import is_employee_on_approved_leave
+            on_leave = await is_employee_on_approved_leave(db, employee.id, today)
+            if on_leave:
+                attendance.status = "leave"
+            
             # Calculate worked hours and overtime
             if check_in.check_in_time and check_in.check_out_time:
                 total_minutes = (check_in.check_out_time - check_in.check_in_time).total_seconds() / 60
@@ -1296,6 +1308,50 @@ async def check_out(
                 
                 attendance.worked_hours = worked_hours
                 attendance.break_minutes = break_minutes
+                
+                # ==================== NIGHT WORK DETECTION ====================
+                # Detect hours worked between 22:00 and 06:00 (late-night work)
+                in_time = check_in.check_in_time.time()
+                out_time = check_in.check_out_time.time()
+                night_hours = await AttendanceService.calculate_night_work_hours(
+                    in_time.strftime("%H:%M"),
+                    out_time.strftime("%H:%M")
+                )
+                attendance.night_hours = night_hours
+                
+                # Calculate night allowance if configured
+                if night_hours > 0 and employee.wage_config:
+                    night_allowance = night_hours * employee.wage_config.hourly_rate * employee.wage_config.night_shift_multiplier
+                    attendance.night_allowance = round(night_allowance, 2)
+                
+                # Store in LateNightWork table if there are night hours
+                if night_hours > 0:
+                    night_record_result = await db.execute(
+                        select(LateNightWork).where(
+                            and_(
+                                LateNightWork.employee_id == employee.id,
+                                LateNightWork.work_date == today
+                            )
+                        )
+                    )
+                    night_record = night_record_result.scalar_one_or_none()
+                    
+                    if not night_record:
+                        night_record = LateNightWork(
+                            employee_id=employee.id,
+                            work_date=today,
+                            night_start_time=in_time.strftime("%H:%M"),
+                            night_end_time=out_time.strftime("%H:%M"),
+                            night_hours=night_hours,
+                            night_allowance_rate=employee.wage_config.night_shift_multiplier if employee.wage_config else 1.5,
+                            night_allowance_amount=attendance.night_allowance
+                        )
+                        db.add(night_record)
+                    else:
+                        night_record.night_hours = night_hours
+                        night_record.night_allowance_rate = employee.wage_config.night_shift_multiplier if employee.wage_config else 1.5
+                        night_record.night_allowance_amount = attendance.night_allowance
+                        db.add(night_record)
                 
                 # ==================== OVERTIME CALCULATION ====================
                 # Rule: Calculate overtime based on approved overtime window
@@ -2465,6 +2521,8 @@ async def approve_leave(
     current_user: User = Depends(require_manager),
     db: AsyncSession = Depends(get_db)
 ):
+    from app.helpers import calculate_leave_days, deduct_leave_balance, create_notification
+    
     result = await db.execute(select(LeaveRequest).filter(LeaveRequest.id == leave_id))
     leave_request = result.scalar_one_or_none()
 
@@ -2478,14 +2536,57 @@ async def approve_leave(
     if not manager:
         raise HTTPException(status_code=403, detail="User is not a manager")
 
+    # ========== CALCULATE AND DEDUCT LEAVE BALANCE ==========
+    days_to_deduct = await calculate_leave_days(
+        leave_request.start_date,
+        leave_request.end_date,
+        leave_request.leave_type
+    )
+    
+    success, message = await deduct_leave_balance(
+        db,
+        leave_request.employee_id,
+        days_to_deduct,
+        leave_request.leave_type
+    )
+    
+    if not success:
+        # Balance deduction failed, reject the leave
+        leave_request.status = LeaveStatus.REJECTED
+        leave_request.manager_id = manager.id
+        leave_request.reviewed_at = datetime.utcnow()
+        leave_request.review_notes = f"Auto-rejected: {message}"
+        await db.commit()
+        raise HTTPException(status_code=400, detail=f"Cannot approve: {message}")
+    
+    # ========== APPROVE THE LEAVE ==========
     leave_request.status = LeaveStatus.APPROVED
     leave_request.manager_id = manager.id
     leave_request.reviewed_at = datetime.utcnow()
     leave_request.review_notes = approval_data.review_notes
-
+    
+    # ========== GET EMPLOYEE INFO FOR NOTIFICATION ==========
+    emp_result = await db.execute(select(Employee).where(Employee.id == leave_request.employee_id))
+    employee = emp_result.scalar_one_or_none()
+    
+    # ========== CREATE NOTIFICATION FOR EMPLOYEE ==========
+    if employee and employee.user_id:
+        await create_notification(
+            db,
+            employee.user_id,
+            "Leave Request Approved",
+            f"Your leave request from {leave_request.start_date} to {leave_request.end_date} has been approved. ({days_to_deduct} days)",
+            notification_type="leave_approved",
+            related_id=leave_request.id
+        )
+    
     await db.commit()
 
-    return {"message": "Leave approved successfully"}
+    return {
+        "message": "Leave approved successfully",
+        "days_deducted": days_to_deduct,
+        "leave_balance_update": message
+    }
 
 
 @app.post("/manager/reject-leave/{leave_id}")
@@ -2495,6 +2596,8 @@ async def reject_leave(
     current_user: User = Depends(require_manager),
     db: AsyncSession = Depends(get_db)
 ):
+    from app.helpers import create_notification
+    
     result = await db.execute(select(LeaveRequest).filter(LeaveRequest.id == leave_id))
     leave_request = result.scalar_one_or_none()
 
@@ -2512,6 +2615,21 @@ async def reject_leave(
     leave_request.manager_id = manager.id
     leave_request.reviewed_at = datetime.utcnow()
     leave_request.review_notes = approval_data.review_notes
+    
+    # ========== GET EMPLOYEE INFO FOR NOTIFICATION ==========
+    emp_result = await db.execute(select(Employee).where(Employee.id == leave_request.employee_id))
+    employee = emp_result.scalar_one_or_none()
+    
+    # ========== CREATE NOTIFICATION FOR EMPLOYEE ==========
+    if employee and employee.user_id:
+        await create_notification(
+            db,
+            employee.user_id,
+            "Leave Request Rejected",
+            f"Your leave request from {leave_request.start_date} to {leave_request.end_date} has been rejected.\nReason: {approval_data.review_notes}",
+            notification_type="leave_rejected",
+            related_id=leave_request.id
+        )
 
     await db.commit()
 
@@ -4259,6 +4377,18 @@ async def approve_overtime_request(
     await db.commit()
     await db.refresh(ot_request)
     
+    # ========== CREATE NOTIFICATION FOR EMPLOYEE ==========
+    from app.helpers import create_notification
+    if employee and employee.user_id:
+        await create_notification(
+            db,
+            employee.user_id,
+            "Overtime Approved",
+            f"Your overtime request for {ot_request.request_date} ({ot_request.request_hours} hours) has been approved.",
+            notification_type="overtime_approved",
+            related_id=ot_request.id
+        )
+    
     return ot_request
 
 
@@ -4294,6 +4424,18 @@ async def reject_overtime_request(
     
     await db.commit()
     await db.refresh(ot_request)
+    
+    # ========== CREATE NOTIFICATION FOR EMPLOYEE ==========
+    from app.helpers import create_notification
+    if employee and employee.user_id:
+        await create_notification(
+            db,
+            employee.user_id,
+            "Overtime Rejected",
+            f"Your overtime request for {ot_request.request_date} has been rejected.\nReason: {rejection_data.get('approval_notes', 'No reason provided')}",
+            notification_type="overtime_rejected",
+            related_id=ot_request.id
+        )
     
     return ot_request
 
@@ -4367,6 +4509,18 @@ async def manager_approve_overtime(
     db.add(ot_request)
     await db.commit()
     await db.refresh(ot_request)
+    
+    # ========== CREATE NOTIFICATION FOR EMPLOYEE ==========
+    from app.helpers import create_notification
+    if employee and employee.user_id:
+        await create_notification(
+            db,
+            employee.user_id,
+            "Overtime Approved",
+            f"Your overtime request for {request_date} ({request_hours} hours) from {from_time} to {to_time} has been approved.",
+            notification_type="overtime_approved",
+            related_id=ot_request.id
+        )
     
     return ot_request
     await db.commit()
@@ -4645,6 +4799,495 @@ async def delete_all_roles(
     await db.commit()
 
     return {"message": f"Deleted {count} roles", "count": count}
+
+
+# ==================== COMPREHENSIVE ATTENDANCE MANAGEMENT ====================
+
+@app.get("/attendance/summary-detailed/{employee_id}")
+async def get_detailed_attendance_summary(
+    employee_id: int,
+    period_type: str = 'monthly',
+    period_date: Optional[str] = None,
+    current_user: User = Depends(get_current_active_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """Get comprehensive detailed attendance summary for an employee"""
+    
+    # Parse period date
+    if period_date:
+        try:
+            period_date = datetime.strptime(period_date, '%Y-%m-%d').date()
+        except ValueError:
+            period_date = date.today()
+    else:
+        period_date = date.today()
+    
+    # Get summary from service
+    summary = await AttendanceService.aggregate_attendance_summary(
+        db, employee_id, period_type, period_date
+    )
+    
+    return {
+        "success": True,
+        "data": summary
+    }
+
+
+@app.get("/attendance/comprehensive-report")
+async def get_comprehensive_attendance_report(
+    start_date: str,
+    end_date: str,
+    department_id: Optional[int] = None,
+    current_user: User = Depends(require_manager),
+    db: AsyncSession = Depends(get_db)
+):
+    """Get comprehensive attendance report for department or all employees"""
+    
+    try:
+        start = datetime.strptime(start_date, '%Y-%m-%d').date()
+        end = datetime.strptime(end_date, '%Y-%m-%d').date()
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid date format")
+    
+    # Get employees
+    if department_id:
+        emp_result = await db.execute(
+            select(Employee).where(
+                and_(
+                    Employee.department_id == department_id,
+                    Employee.is_active == True
+                )
+            )
+        )
+    else:
+        emp_result = await db.execute(select(Employee).where(Employee.is_active == True))
+    
+    employees = emp_result.scalars().all()
+    
+    reports = []
+    for emp in employees:
+        summary = await AttendanceService.aggregate_attendance_summary(
+            db, emp.id, 'monthly', start
+        )
+        reports.append({
+            "employee_id": emp.employee_id,
+            "employee_name": f"{emp.first_name} {emp.last_name}",
+            **summary
+        })
+    
+    return {
+        "success": True,
+        "period": {
+            "start": start.isoformat(),
+            "end": end.isoformat()
+        },
+        "total_employees": len(reports),
+        "data": reports
+    }
+
+
+@app.get("/attendance/validate/{employee_id}")
+async def validate_attendance_data(
+    employee_id: int,
+    start_date: str,
+    end_date: str,
+    current_user: User = Depends(require_manager),
+    db: AsyncSession = Depends(get_db)
+):
+    """Validate attendance data for completeness and accuracy"""
+    
+    try:
+        start = datetime.strptime(start_date, '%Y-%m-%d').date()
+        end = datetime.strptime(end_date, '%Y-%m-%d').date()
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid date format")
+    
+    validation_result = await AttendanceService.validate_attendance_data(
+        db, employee_id, start, end
+    )
+    
+    return {
+        "success": True,
+        "data": validation_result
+    }
+
+
+@app.post("/attendance/summary/create")
+async def create_attendance_summary(
+    employee_id: int,
+    period_type: str = 'monthly',
+    period_date: Optional[str] = None,
+    current_user: User = Depends(require_manager),
+    db: AsyncSession = Depends(get_db)
+):
+    """Create or update attendance summary record"""
+    
+    if period_date:
+        try:
+            period_date = datetime.strptime(period_date, '%Y-%m-%d').date()
+        except ValueError:
+            period_date = date.today()
+    else:
+        period_date = date.today()
+    
+    summary = await AttendanceService.create_or_update_attendance_summary(
+        db, employee_id, period_type, period_date
+    )
+    
+    return {
+        "success": True,
+        "message": "Attendance summary created/updated successfully",
+        "data": {
+            "id": summary.id,
+            "employee_id": summary.employee_id,
+            "period_type": summary.period_type,
+            "period_date": summary.period_date.isoformat(),
+            "total_worked_hours": summary.total_worked_hours,
+            "overtime_hours": summary.overtime_hours,
+            "night_hours": summary.night_hours
+        }
+    }
+
+
+# ==================== PAID LEAVE REMINDER MANAGEMENT ====================
+
+@app.get("/leave/balance-summary/{employee_id}")
+async def get_leave_balance_summary(
+    employee_id: int,
+    year: Optional[int] = None,
+    current_user: User = Depends(get_current_active_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """Get paid leave balance summary for an employee"""
+    
+    if year is None:
+        year = date.today().year
+    
+    balance_info = await LeaveReminderService.check_leave_balance(db, employee_id, year)
+    
+    return {
+        "success": True,
+        "data": balance_info
+    }
+
+
+@app.get("/leave/trends/{employee_id}")
+async def get_leave_trends(
+    employee_id: int,
+    num_years: int = 3,
+    current_user: User = Depends(get_current_active_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """Analyze leave trends for an employee"""
+    
+    trends = await LeaveReminderService.get_leave_trends(db, employee_id, num_years)
+    
+    return {
+        "success": True,
+        "data": trends
+    }
+
+
+@app.post("/leave/send-reminders")
+async def send_leave_reminders(
+    reminder_type: str = 'low_balance',
+    threshold_days: int = 3,
+    current_user: User = Depends(require_manager),
+    db: AsyncSession = Depends(get_db)
+):
+    """Send paid leave reminders to employees"""
+    
+    if reminder_type == 'low_balance':
+        reminders = await LeaveReminderService.send_reminders_to_low_balance(db, threshold_days)
+    elif reminder_type == 'mid_year':
+        reminders = await LeaveReminderService.send_mid_year_reminder(db)
+    elif reminder_type == 'year_end':
+        reminders = await LeaveReminderService.send_year_end_reminder(db)
+    else:
+        raise HTTPException(status_code=400, detail="Invalid reminder type")
+    
+    return {
+        "success": True,
+        "message": f"Sent {len(reminders)} reminders",
+        "reminders_sent": reminders
+    }
+
+
+@app.post("/leave/acknowledge-reminder/{reminder_id}")
+async def acknowledge_reminder(
+    reminder_id: int,
+    action_taken: Optional[str] = None,
+    current_user: User = Depends(get_current_active_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """Acknowledge a leave reminder"""
+    
+    reminder = await LeaveReminderService.track_reminder_sent(
+        db, reminder_id, action_taken, is_acknowledged=True
+    )
+    
+    if not reminder:
+        raise HTTPException(status_code=404, detail="Reminder not found")
+    
+    return {
+        "success": True,
+        "message": "Reminder acknowledged",
+        "data": {
+            "id": reminder.id,
+            "employee_id": reminder.employee_id,
+            "is_acknowledged": reminder.is_acknowledged,
+            "acknowledgment_date": reminder.acknowledgment_date.isoformat() if reminder.acknowledgment_date else None
+        }
+    }
+
+
+@app.get("/leave/department-summary/{department_id}")
+async def get_department_leave_summary(
+    department_id: int,
+    year: Optional[int] = None,
+    current_user: User = Depends(require_manager),
+    db: AsyncSession = Depends(get_db)
+):
+    """Get leave summary for all employees in a department"""
+    
+    if year is None:
+        year = date.today().year
+    
+    summary = await LeaveReminderService.get_department_leave_summary(db, department_id, year)
+    
+    return {
+        "success": True,
+        "data": summary
+    }
+
+
+# ==================== PAYROLL WAGE CALCULATION ====================
+
+@app.post("/payroll/configure-employee")
+async def configure_employee_wage(
+    employee_id: int,
+    hourly_rate: float,
+    overtime_multiplier: float = 1.5,
+    night_shift_multiplier: float = 1.5,
+    current_user: User = Depends(require_manager),
+    db: AsyncSession = Depends(get_db)
+):
+    """Configure wage settings for an employee"""
+    
+    config = await WageCalculationService.get_or_create_wage_config(
+        db, employee_id, hourly_rate, overtime_multiplier, night_shift_multiplier
+    )
+    
+    return {
+        "success": True,
+        "message": "Wage configuration saved",
+        "data": {
+            "id": config.id,
+            "employee_id": config.employee_id,
+            "hourly_rate": config.hourly_rate,
+            "overtime_multiplier": config.overtime_multiplier,
+            "night_shift_multiplier": config.night_shift_multiplier
+        }
+    }
+
+
+@app.post("/payroll/process-cycle")
+async def process_payroll_cycle(
+    start_date: str,
+    current_user: User = Depends(require_admin),
+    db: AsyncSession = Depends(get_db)
+):
+    """Process 15-day payroll closing cycle"""
+    
+    try:
+        start = datetime.strptime(start_date, '%Y-%m-%d').date()
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid date format")
+    
+    # Get or create payroll cycle
+    cycle = await WageCalculationService.get_payroll_cycle(db, start)
+    
+    # Get all employees
+    emp_result = await db.execute(
+        select(Employee).where(
+            and_(
+                Employee.is_active == True,
+                Employee.wage_config != None
+            )
+        ).options(selectinload(Employee.wage_config))
+    )
+    employees = emp_result.scalars().all()
+    
+    processed = 0
+    errors = []
+    
+    for emp in employees:
+        try:
+            wage_calc = await WageCalculationService.calculate_wage_for_period(
+                db, emp.id, cycle
+            )
+            processed += 1
+        except Exception as e:
+            errors.append({
+                "employee_id": emp.employee_id,
+                "error": str(e)
+            })
+    
+    return {
+        "success": True,
+        "message": f"Processed {processed} employees",
+        "data": {
+            "cycle_id": cycle.id,
+            "cycle_number": cycle.cycle_number,
+            "start_date": cycle.start_date.isoformat(),
+            "end_date": cycle.end_date.isoformat(),
+            "processed_count": processed,
+            "errors": errors
+        }
+    }
+
+
+@app.post("/payroll/close-cycle/{cycle_id}")
+async def close_payroll_cycle(
+    cycle_id: int,
+    current_user: User = Depends(require_admin),
+    db: AsyncSession = Depends(get_db)
+):
+    """Close and verify 15-day payroll cycle"""
+    
+    cycle_result = await db.execute(
+        select(PayrollCycle).where(PayrollCycle.id == cycle_id)
+    )
+    cycle = cycle_result.scalar_one_or_none()
+    
+    if not cycle:
+        raise HTTPException(status_code=404, detail="Cycle not found")
+    
+    result = await WageCalculationService.verify_and_close_cycle(db, cycle)
+    
+    return {
+        "success": True,
+        "message": "Payroll cycle closed",
+        "data": result
+    }
+
+
+@app.post("/payroll/confirm-wages/{cycle_id}")
+async def confirm_wages(
+    cycle_id: int,
+    current_user: User = Depends(require_admin),
+    db: AsyncSession = Depends(get_db)
+):
+    """Confirm 18-day wage cycle"""
+    
+    cycle_result = await db.execute(
+        select(PayrollCycle).where(PayrollCycle.id == cycle_id)
+    )
+    cycle = cycle_result.scalar_one_or_none()
+    
+    if not cycle:
+        raise HTTPException(status_code=404, detail="Cycle not found")
+    
+    result = await WageCalculationService.confirm_wages(db, cycle)
+    
+    return {
+        "success": True,
+        "message": "Wages confirmed",
+        "data": result
+    }
+
+
+@app.get("/payroll/wage-summary/{employee_id}")
+async def get_wage_summary(
+    employee_id: int,
+    start_date: str,
+    end_date: str,
+    current_user: User = Depends(get_current_active_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """Get wage summary for an employee over a date range"""
+    
+    try:
+        start = datetime.strptime(start_date, '%Y-%m-%d').date()
+        end = datetime.strptime(end_date, '%Y-%m-%d').date()
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid date format")
+    
+    summary = await WageCalculationService.get_wage_summary_for_employee(
+        db, employee_id, start, end
+    )
+    
+    return {
+        "success": True,
+        "data": summary
+    }
+
+
+@app.get("/payroll/employee-wages/{employee_id}")
+async def export_employee_wages(
+    employee_id: int,
+    start_date: str,
+    end_date: str,
+    current_user: User = Depends(get_current_active_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """Export employee wage data as detailed report"""
+    
+    try:
+        start = datetime.strptime(start_date, '%Y-%m-%d').date()
+        end = datetime.strptime(end_date, '%Y-%m-%d').date()
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid date format")
+    
+    summary = await WageCalculationService.get_wage_summary_for_employee(
+        db, employee_id, start, end
+    )
+    
+    return {
+        "success": True,
+        "data": summary
+    }
+
+
+@app.get("/payroll/cycles")
+async def get_payroll_cycles(
+    year: Optional[int] = None,
+    is_closed: Optional[bool] = None,
+    current_user: User = Depends(require_admin),
+    db: AsyncSession = Depends(get_db)
+):
+    """Get list of payroll cycles"""
+    
+    if year is None:
+        year = date.today().year
+    
+    query = select(PayrollCycle).where(PayrollCycle.year == year)
+    
+    if is_closed is not None:
+        query = query.where(PayrollCycle.is_closed == is_closed)
+    
+    result = await db.execute(query)
+    cycles = result.scalars().all()
+    
+    return {
+        "success": True,
+        "data": [
+            {
+                "id": c.id,
+                "cycle_number": c.cycle_number,
+                "year": c.year,
+                "start_date": c.start_date.isoformat(),
+                "end_date": c.end_date.isoformat(),
+                "closing_date": c.closing_date.isoformat() if c.closing_date else None,
+                "confirmation_date": c.confirmation_date.isoformat() if c.confirmation_date else None,
+                "is_closed": c.is_closed,
+                "is_confirmed": c.is_confirmed,
+                "processed_employees": c.processed_employees,
+                "confirmed_employees": c.confirmed_employees
+            }
+            for c in cycles
+        ]
+    }
 
 
 if __name__ == "__main__":
